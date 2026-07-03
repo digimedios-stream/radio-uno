@@ -13,6 +13,7 @@ const volumeValue = document.getElementById('volumeValue');
 const statusText = document.getElementById('statusText');
 const statusDot = document.querySelector('.status-dot');
 const menuBtn = document.getElementById('menuBtn');
+const closeMenuBtn = document.getElementById('closeMenuBtn');
 const mobileMenu = document.getElementById('mobileMenu');
 const equalizerBtn = document.getElementById('equalizerBtn');
 const equalizerMenuBtn = document.getElementById('equalizerMenuBtn');
@@ -219,6 +220,7 @@ function setupEventListeners() {
     
     // Menú móvil
     menuBtn.addEventListener('click', toggleMenu);
+    closeMenuBtn.addEventListener('click', closeMenu);
     
     // Ecualizador
     equalizerBtn.addEventListener('click', openEqualizer);
@@ -235,7 +237,7 @@ function setupEventListeners() {
     
     // Cerrar menú al hacer click fuera
     document.addEventListener('click', (e) => {
-        if (!menuBtn.contains(e.target) && !mobileMenu.contains(e.target)) {
+        if (!mobileMenu.classList.contains('hidden') && !menuBtn.contains(e.target) && !mobileMenu.contains(e.target)) {
             closeMenu();
         }
     });
