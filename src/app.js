@@ -2,6 +2,7 @@
 let audioContext;
 let audioElement;
 let analyser;
+let audioSource; // Guardar la fuente de audio
 let isPlaying = false;
 let deferredPrompt;
 
@@ -79,15 +80,18 @@ function initAudio() {
     analyser = audioContext.createAnalyser();
     analyser.fftSize = 256;
     
-    // Conectar elemento de audio al contexto
-    try {
-        const source = audioContext.createMediaElementAudioSource(audioElement);
-        source.connect(analyser);
-        analyser.connect(audioContext.destination);
-    } catch (e) {
-        console.warn('No se pudo conectar al analizador:', e);
-        // Fallback: conectar directamente al destino
-        analyser.connect(audioContext.destination);
+    // Conectar elemento de audio al contexto (solo una vez)
+    if (!audioSource) {
+        try {
+            audioSource = audioContext.createMediaElementAudioSource(audioElement);
+            audioSource.connect(analyser);
+            analyser.connect(audioContext.destination);
+            console.log('Audio source conectado correctamente');
+        } catch (e) {
+            console.warn('No se pudo conectar al analizador:', e);
+            // Fallback: conectar directamente al destino
+            analyser.connect(audioContext.destination);
+        }
     }
     
     // Configurar volumen inicial
