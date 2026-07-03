@@ -59,33 +59,36 @@ self.addEventListener('fetch', (event) => {
         return;
     }
     
-    // Estrategia: Cache first, fallback to network
+    // Estrategia: Network first, fallback to cache (siempre obtiene la versión más nueva de la app)
     event.respondWith(
-        caches.match(event.request)
+        fetch(event.request)
             .then((response) => {
-                if (response) {
+                // Validar la respuesta
+                if (!response || response.status !== 200 || response.type === 'error') {
                     return response;
                 }
                 
-                return fetch(event.request)
-                    .then((response) => {
-                        // No cachear requests fallidas
-                        if (!response || response.status !== 200 || response.type === 'error') {
-                            return response;
+                // Cachear respuesta exitosa para uso offline futuro
+                const responseToCache = response.clone();
+                caches.open(CACHE_NAME)
+                    .then((cache) => {
+                        cache.put(event.request, responseToCache);
+                    });
+                
+                return response;
+            })
+            .catch(() => {
+                // Si el usuario no tiene internet (falla fetch), servir desde el cache
+                return caches.match(event.request)
+                    .then((cachedResponse) => {
+                        if (cachedResponse) {
+                            return cachedResponse;
                         }
                         
-                        // Cachear respuesta exitosa
-                        const responseToCache = response.clone();
-                        caches.open(CACHE_NAME)
-                            .then((cache) => {
-                                cache.put(event.request, responseToCache);
-                            });
-                        
-                        return response;
-                    })
-                    .catch(() => {
-                        // Fallback offline
-                        return caches.match('/index.html');
+                        // Fallback genérico para vistas HTML
+                        if (event.request.headers.get('accept').includes('text/html')) {
+                            return caches.match('/index.html');
+                        }
                     });
             })
     );
