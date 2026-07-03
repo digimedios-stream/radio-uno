@@ -19,7 +19,7 @@ class Equalizer {
     init() {
         // Esperar a que el contexto de audio esté disponible
         const checkContext = setInterval(() => {
-            if (window.audioContext && window.audioElement) {
+            if (window.audioContext && window.audioElement && window.audioSource) {
                 clearInterval(checkContext);
                 this.setupFilters();
                 this.setupEventListeners();
@@ -30,7 +30,7 @@ class Equalizer {
     
     setupFilters() {
         const audioContext = window.audioContext;
-        const audioElement = window.audioElement;
+        const audioSource = window.audioSource;
         
         // Crear filtros para cada frecuencia
         const frequencies = [60, 250, 1000, 4000, 16000];
@@ -44,17 +44,26 @@ class Equalizer {
             this.filters[freq] = filter;
         });
         
+        // Desconectar la conexión anterior
+        try {
+            audioSource.disconnect();
+        } catch (e) {
+            console.warn('No se pudo desconectar:', e);
+        }
+        
         // Conectar filtros en cadena
-        const source = audioContext.createMediaElementAudioSource(audioElement);
-        let lastNode = source;
+        let lastNode = audioSource;
         
         frequencies.forEach(freq => {
             lastNode.connect(this.filters[freq]);
             lastNode = this.filters[freq];
         });
         
+        // Conectar al analizador y al destino
         lastNode.connect(window.analyser);
         window.analyser.connect(audioContext.destination);
+        
+        console.log('Ecualizador configurado correctamente');
     }
     
     setupEventListeners() {
@@ -70,6 +79,7 @@ class Equalizer {
                 // Aplicar filtro
                 if (this.filters[freq]) {
                     this.filters[freq].gain.value = value;
+                    console.log(`Filtro ${freq}Hz: ${value}dB`);
                 }
                 
                 // Marcar preset como personalizado
@@ -109,6 +119,7 @@ class Equalizer {
             // Aplicar filtro
             if (this.filters[freqNum]) {
                 this.filters[freqNum].gain.value = gain;
+                console.log(`Preset ${presetName}: ${freqNum}Hz = ${gain}dB`);
             }
         });
         

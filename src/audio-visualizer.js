@@ -58,18 +58,18 @@ class AudioVisualizer {
         const barWidth = width / this.bufferLength * 2.5;
         let x = 0;
         
-        // Crear gradiente
+        // Crear gradiente más visible
         const gradient = this.ctx.createLinearGradient(0, 0, 0, height);
-        gradient.addColorStop(0, 'rgba(99, 102, 241, 0.8)');
-        gradient.addColorStop(0.5, 'rgba(139, 92, 246, 0.6)');
-        gradient.addColorStop(1, 'rgba(16, 185, 129, 0.4)');
+        gradient.addColorStop(0, 'rgba(99, 102, 241, 1)');
+        gradient.addColorStop(0.5, 'rgba(139, 92, 246, 0.9)');
+        gradient.addColorStop(1, 'rgba(16, 185, 129, 0.8)');
         
         this.ctx.fillStyle = gradient;
-        this.ctx.strokeStyle = 'rgba(99, 102, 241, 0.3)';
+        this.ctx.strokeStyle = 'rgba(99, 102, 241, 0.6)';
         this.ctx.lineWidth = 1;
         
         for (let i = 0; i < this.bufferLength; i++) {
-            const barHeight = (this.dataArray[i] / 255) * height * 0.8;
+            const barHeight = (this.dataArray[i] / 255) * height * 0.9;
             
             // Dibujar barra
             this.ctx.fillRect(x, height - barHeight, barWidth, barHeight);
