@@ -44,14 +44,7 @@ class Equalizer {
             this.filters[freq] = filter;
         });
         
-        // Desconectar la conexión anterior
-        try {
-            audioSource.disconnect();
-        } catch (e) {
-            console.warn('No se pudo desconectar:', e);
-        }
-        
-        // Conectar filtros en cadena
+        // Conectar filtros en cadena (sin desconectar, ya está conectado)
         let lastNode = audioSource;
         
         frequencies.forEach(freq => {
@@ -61,7 +54,6 @@ class Equalizer {
         
         // Conectar al analizador y al destino
         lastNode.connect(window.analyser);
-        window.analyser.connect(audioContext.destination);
         
         console.log('Ecualizador configurado correctamente');
     }
