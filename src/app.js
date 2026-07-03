@@ -60,6 +60,7 @@ window.STREAMS = STREAMS;
 // Inicializar
 document.addEventListener('DOMContentLoaded', () => {
     initAudio();
+    initMetadata(); // Inicializar obtención de metadatos
     setupEventListeners();
     setupPWA();
 });
@@ -83,7 +84,7 @@ function initAudio() {
     // Conectar elemento de audio al contexto (solo una vez)
     if (!audioSource) {
         try {
-            audioSource = audioContext.createMediaElementAudioSource(audioElement);
+            audioSource = audioContext.createMediaElementSource(audioElement);
             audioSource.connect(analyser);
             analyser.connect(audioContext.destination);
             console.log('Audio source conectado correctamente');
@@ -93,6 +94,12 @@ function initAudio() {
             analyser.connect(audioContext.destination);
         }
     }
+    
+    // Exportar para otros módulos
+    window.audioContext = audioContext;
+    window.audioElement = audioElement;
+    window.analyser = analyser;
+    window.audioSource = audioSource;
     
     // Configurar volumen inicial
     updateVolume();
@@ -167,6 +174,39 @@ function initAudio() {
     audioElement.addEventListener('loadedmetadata', () => {
         console.log('Metadata cargado');
     });
+}
+
+// Inicializar la obtención de metadatos de Zeno.fm (Now Playing)
+function initMetadata() {
+    const nowPlayingElement = document.getElementById('nowPlaying');
+    // El ID de la estación de Zeno se extrae de la URL: qt55qqa7dbtuv
+    const zenoStationId = 'qt55qqa7dbtuv';
+    const sseUrl = `https://api.zeno.fm/mounts/metadata/subscribe/${zenoStationId}`;
+    
+    if (window.EventSource) {
+        const source = new EventSource(sseUrl);
+        
+        source.addEventListener('message', (e) => {
+            try {
+                const data = JSON.parse(e.data);
+                if (data.streamTitle) {
+                    nowPlayingElement.textContent = `🎵 ${data.streamTitle}`;
+                    nowPlayingElement.classList.remove('loading-text');
+                } else {
+                    nowPlayingElement.textContent = '🎵 Radio Uno Casereña';
+                }
+            } catch (err) {
+                console.error('Error parseando metadatos:', err);
+            }
+        });
+
+        source.addEventListener('error', (e) => {
+            console.error('Error de conexión SSE con Zeno.fm');
+            // source.close(); // Opcionalmente cerrar si falla mucho
+        });
+    } else {
+        nowPlayingElement.textContent = '🎵 Radio Uno Casereña (Metadatos no soportados)';
+    }
 }
 
 // Configurar event listeners
@@ -329,7 +369,4 @@ installMenuBtn.addEventListener('click', async () => {
     closeMenu();
 });
 
-// Exportar para otros módulos
-window.audioContext = audioContext;
-window.audioElement = audioElement;
-window.analyser = analyser;
+
