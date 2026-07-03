@@ -23,9 +23,8 @@ const dismissBtn = document.getElementById('dismissBtn');
 const installMenuBtn = document.getElementById('installMenuBtn');
 
 // Stream URL - Usando proxy CORS para evitar restricciones
-const STREAM_URL = 'https://stream.zeno.fm/qt55qqa7dbtuv';
-// Alternativa con proxy CORS si es necesario:
-// const STREAM_URL = 'https://cors-anywhere.herokuapp.com/https://stream.zeno.fm/qt55qqa7dbtuv';
+// Se carga desde streams-config.js
+let STREAM_URL = 'https://stream.zeno.fm/qt55qqa7dbtuv';
 
 // Inicializar
 document.addEventListener('DOMContentLoaded', () => {
