@@ -9,9 +9,9 @@ bbox = img.getbbox()
 if bbox:
     img = img.crop(bbox)
 
-# Añadir un pequeño padding consistente (10%)
+# Añadir un padding mayor (35%) para evitar que Android lo recorte en los maskable icons
 width, height = img.size
-padding = int(max(width, height) * 0.1)
+padding = int(max(width, height) * 0.35)
 new_size = (width + padding * 2, height + padding * 2)
 new_img = Image.new("RGBA", new_size, (0, 0, 0, 0))
 new_img.paste(img, (padding, padding))

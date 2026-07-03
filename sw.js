@@ -1,14 +1,14 @@
 const CACHE_NAME = 'radio-uno-v1';
 const urlsToCache = [
-    '/',
-    '/index.html',
-    '/manifest.json',
-    '/src/styles.css',
-    '/src/app.js',
-    '/src/audio-visualizer.js',
-    '/src/equalizer.js',
-    '/src/pwa-installer.js',
-    '/assets/logo.png'
+    './',
+    './index.html',
+    './manifest.json',
+    './src/styles.css',
+    './src/app.js',
+    './src/audio-visualizer.js',
+    './src/equalizer.js',
+    './src/pwa-installer.js',
+    './assets/logo.png'
 ];
 
 // Instalar Service Worker
@@ -87,7 +87,7 @@ self.addEventListener('fetch', (event) => {
                         
                         // Fallback genérico para vistas HTML
                         if (event.request.headers.get('accept').includes('text/html')) {
-                            return caches.match('/index.html');
+                            return caches.match('./index.html');
                         }
                     });
             })
