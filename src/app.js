@@ -49,9 +49,15 @@ function initAudio() {
     analyser.fftSize = 256;
     
     // Conectar elemento de audio al contexto
-    const source = audioContext.createMediaElementAudioSource(audioElement);
-    source.connect(analyser);
-    analyser.connect(audioContext.destination);
+    try {
+        const source = audioContext.createMediaElementAudioSource(audioElement);
+        source.connect(analyser);
+        analyser.connect(audioContext.destination);
+    } catch (e) {
+        console.warn('No se pudo conectar al analizador:', e);
+        // Fallback: conectar directamente al destino
+        analyser.connect(audioContext.destination);
+    }
     
     // Configurar volumen inicial
     updateVolume();
@@ -61,7 +67,9 @@ function initAudio() {
         isPlaying = true;
         playBtn.classList.add('playing');
         updateStatus('Reproduciendo', true);
-        audioContext.resume();
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
     });
     
     audioElement.addEventListener('pause', () => {
@@ -70,9 +78,9 @@ function initAudio() {
         updateStatus('Pausado', false);
     });
     
-    audioElement.addEventListener('error', () => {
+    audioElement.addEventListener('error', (e) => {
         updateStatus('Error de conexión', false);
-        console.error('Error de audio:', audioElement.error);
+        console.error('Error de audio:', audioElement.error, e);
     });
     
     audioElement.addEventListener('loadstart', () => {
@@ -83,6 +91,14 @@ function initAudio() {
         if (isPlaying) {
             updateStatus('Reproduciendo', true);
         }
+    });
+    
+    audioElement.addEventListener('playing', () => {
+        updateStatus('Reproduciendo', true);
+    });
+    
+    audioElement.addEventListener('stalled', () => {
+        updateStatus('Buffering...', false);
     });
 }
 
@@ -120,17 +136,34 @@ function setupEventListeners() {
 
 // Toggle Play/Pause
 function togglePlay() {
-    if (audioContext.state === 'suspended') {
-        audioContext.resume();
+    // Reanudar contexto de audio si está suspendido
+    if (audioContext && audioContext.state === 'suspended') {
+        audioContext.resume().then(() => {
+            console.log('Audio context reanudado');
+        }).catch(err => {
+            console.error('Error al reanudar contexto:', err);
+        });
     }
     
     if (isPlaying) {
         audioElement.pause();
     } else {
-        audioElement.play().catch(err => {
-            console.error('Error al reproducir:', err);
-            updateStatus('Error al reproducir', false);
-        });
+        // Asegurar que el src está configurado
+        if (!audioElement.src) {
+            audioElement.src = STREAM_URL;
+        }
+        
+        const playPromise = audioElement.play();
+        if (playPromise !== undefined) {
+            playPromise
+                .then(() => {
+                    console.log('Reproducción iniciada');
+                })
+                .catch(err => {
+                    console.error('Error al reproducir:', err);
+                    updateStatus('Error: ' + err.message, false);
+                });
+        }
     }
 }
 
