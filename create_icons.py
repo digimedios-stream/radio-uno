@@ -1,5 +1,4 @@
 from PIL import Image
-import os
 
 # Cargar imagen original
 img = Image.open(r'C:\Users\Usuario\Documents\Radio-Uno-Casereña\assets\logo.png').convert("RGBA")
@@ -9,31 +8,32 @@ bbox = img.getbbox()
 if bbox:
     img = img.crop(bbox)
 
-# Añadir un padding mayor (35%) para evitar que Android lo recorte en los maskable icons
+# Añadir padding del 25% para que encaje bien en la zona segura
 width, height = img.size
-padding = int(max(width, height) * 0.35)
+padding = int(max(width, height) * 0.25)
 new_size = (width + padding * 2, height + padding * 2)
-new_img = Image.new("RGBA", new_size, (0, 0, 0, 0))
-new_img.paste(img, (padding, padding))
-img = new_img
 
-# Hacer la imagen cuadrada para el ícono final (centrado)
-max_dim = max(img.size)
-square_img = Image.new("RGBA", (max_dim, max_dim), (0, 0, 0, 0))
-x = (max_dim - img.size[0]) // 2
-y = (max_dim - img.size[1]) // 2
-square_img.paste(img, (x, y))
-img = square_img
+# Centrar la imagen
+x = (new_size[0] - width) // 2
+y = (new_size[1] - height) // 2
 
-# Crear iconos en diferentes tamaños
+# 1. Crear imagen centrada transparente (para iconos normales)
+transparent_bg = Image.new("RGBA", new_size, (0, 0, 0, 0))
+transparent_bg.paste(img, (x, y))
+
+# 2. Crear imagen centrada con fondo oscuro (para iconos maskable y splash screen)
+# El color es #0f172a (RGB: 15, 23, 42)
+dark_bg = Image.new("RGBA", new_size, (15, 23, 42, 255))
+dark_bg.paste(img, (x, y), mask=img)
+
 sizes = [192, 512]
 for size in sizes:
     # Icono normal
-    icon = img.resize((size, size), Image.Resampling.LANCZOS)
+    icon = transparent_bg.resize((size, size), Image.Resampling.LANCZOS)
     icon.save(rf'C:\Users\Usuario\Documents\Radio-Uno-Casereña\assets\icon-{size}.png')
     
     # Icono maskable (para Android)
-    icon_maskable = img.resize((size, size), Image.Resampling.LANCZOS)
+    icon_maskable = dark_bg.resize((size, size), Image.Resampling.LANCZOS)
     icon_maskable.save(rf'C:\Users\Usuario\Documents\Radio-Uno-Casereña\assets\icon-{size}-maskable.png')
 
 print('Iconos creados exitosamente')
