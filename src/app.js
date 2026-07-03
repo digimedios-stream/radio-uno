@@ -26,6 +26,36 @@ const installMenuBtn = document.getElementById('installMenuBtn');
 // Se carga desde streams-config.js
 let STREAM_URL = 'https://stream.zeno.fm/qt55qqa7dbtuv';
 
+// Configuración de streams alternativos
+const STREAMS = {
+    // Stream principal de Zeno.fm
+    zeno: 'https://stream.zeno.fm/qt55qqa7dbtuv',
+    
+    // Usando un proxy CORS público (puede ser lento pero funciona en desarrollo local)
+    zenoCors: 'https://cors-anywhere.herokuapp.com/https://stream.zeno.fm/qt55qqa7dbtuv',
+    
+    // Stream de prueba (para verificar que la app funciona)
+    test: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+};
+
+// Función para cambiar stream
+function switchStream(streamKey) {
+    if (STREAMS[streamKey]) {
+        STREAM_URL = STREAMS[streamKey];
+        if (window.audioElement) {
+            window.audioElement.src = STREAM_URL;
+            console.log('Stream cambiado a:', streamKey, '→', STREAM_URL);
+        }
+    } else {
+        console.error('Stream no encontrado:', streamKey);
+        console.log('Streams disponibles:', Object.keys(STREAMS));
+    }
+}
+
+// Exportar
+window.switchStream = switchStream;
+window.STREAMS = STREAMS;
+
 // Inicializar
 document.addEventListener('DOMContentLoaded', () => {
     initAudio();
