@@ -22,8 +22,10 @@ const installBtn = document.getElementById('installBtn');
 const dismissBtn = document.getElementById('dismissBtn');
 const installMenuBtn = document.getElementById('installMenuBtn');
 
-// Stream URL
+// Stream URL - Usando proxy CORS para evitar restricciones
 const STREAM_URL = 'https://stream.zeno.fm/qt55qqa7dbtuv';
+// Alternativa con proxy CORS si es necesario:
+// const STREAM_URL = 'https://cors-anywhere.herokuapp.com/https://stream.zeno.fm/qt55qqa7dbtuv';
 
 // Inicializar
 document.addEventListener('DOMContentLoaded', () => {
@@ -62,6 +64,9 @@ function initAudio() {
     // Configurar volumen inicial
     updateVolume();
     
+    // Timeout para detectar si no se conecta
+    let connectionTimeout;
+    
     // Event listeners del audio
     audioElement.addEventListener('play', () => {
         isPlaying = true;
@@ -70,35 +75,64 @@ function initAudio() {
         if (audioContext.state === 'suspended') {
             audioContext.resume();
         }
+        // Limpiar timeout si se conecta
+        clearTimeout(connectionTimeout);
     });
     
     audioElement.addEventListener('pause', () => {
         isPlaying = false;
         playBtn.classList.remove('playing');
         updateStatus('Pausado', false);
+        clearTimeout(connectionTimeout);
     });
     
     audioElement.addEventListener('error', (e) => {
-        updateStatus('Error de conexión', false);
+        clearTimeout(connectionTimeout);
+        const errorCode = audioElement.error?.code;
+        let errorMsg = 'Error de conexión';
+        
+        if (errorCode === 4) {
+            errorMsg = 'Formato no soportado';
+        } else if (errorCode === 3) {
+            errorMsg = 'Descarga interrumpida';
+        } else if (errorCode === 2) {
+            errorMsg = 'Error de red';
+        }
+        
+        updateStatus(errorMsg, false);
         console.error('Error de audio:', audioElement.error, e);
     });
     
     audioElement.addEventListener('loadstart', () => {
         updateStatus('Conectando...', false);
+        
+        // Timeout de 10 segundos para conectar
+        connectionTimeout = setTimeout(() => {
+            if (!isPlaying) {
+                updateStatus('Timeout de conexión', false);
+                console.warn('Timeout: No se pudo conectar al stream');
+            }
+        }, 10000);
     });
     
     audioElement.addEventListener('canplay', () => {
+        clearTimeout(connectionTimeout);
         if (isPlaying) {
             updateStatus('Reproduciendo', true);
         }
     });
     
     audioElement.addEventListener('playing', () => {
+        clearTimeout(connectionTimeout);
         updateStatus('Reproduciendo', true);
     });
     
     audioElement.addEventListener('stalled', () => {
         updateStatus('Buffering...', false);
+    });
+    
+    audioElement.addEventListener('loadedmetadata', () => {
+        console.log('Metadata cargado');
     });
 }
 
