@@ -32,10 +32,10 @@ let STREAM_URL = 'https://stream.zeno.fm/qt55qqa7dbtuv';
 const STREAMS = {
     // Stream principal de Zeno.fm
     zeno: 'https://stream.zeno.fm/qt55qqa7dbtuv',
-    
+
     // Usando un proxy CORS público (puede ser lento pero funciona en desarrollo local)
     zenoCors: 'https://cors-anywhere.herokuapp.com/https://stream.zeno.fm/qt55qqa7dbtuv',
-    
+
     // Stream de prueba (para verificar que la app funciona)
     test: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
 };
@@ -72,16 +72,16 @@ function initAudio() {
     audioElement = new Audio();
     audioElement.crossOrigin = 'anonymous';
     audioElement.src = STREAM_URL;
-    
+
     // Crear contexto de audio
     if (!audioContext) {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
-    
+
     // Crear analizador
     analyser = audioContext.createAnalyser();
     analyser.fftSize = 256;
-    
+
     // Conectar elemento de audio al contexto (solo una vez)
     if (!audioSource) {
         try {
@@ -95,19 +95,19 @@ function initAudio() {
             analyser.connect(audioContext.destination);
         }
     }
-    
+
     // Exportar para otros módulos
     window.audioContext = audioContext;
     window.audioElement = audioElement;
     window.analyser = analyser;
     window.audioSource = audioSource;
-    
+
     // Configurar volumen inicial
     updateVolume();
-    
+
     // Timeout para detectar si no se conecta
     let connectionTimeout;
-    
+
     // Event listeners del audio
     audioElement.addEventListener('play', () => {
         isPlaying = true;
@@ -119,19 +119,19 @@ function initAudio() {
         // Limpiar timeout si se conecta
         clearTimeout(connectionTimeout);
     });
-    
+
     audioElement.addEventListener('pause', () => {
         isPlaying = false;
         playBtn.classList.remove('playing');
         updateStatus('Pausado', false);
         clearTimeout(connectionTimeout);
     });
-    
+
     audioElement.addEventListener('error', (e) => {
         clearTimeout(connectionTimeout);
         const errorCode = audioElement.error?.code;
         let errorMsg = 'Error de conexión';
-        
+
         if (errorCode === 4) {
             errorMsg = 'Formato no soportado';
         } else if (errorCode === 3) {
@@ -139,14 +139,14 @@ function initAudio() {
         } else if (errorCode === 2) {
             errorMsg = 'Error de red';
         }
-        
+
         updateStatus(errorMsg, false);
         console.error('Error de audio:', audioElement.error, e);
     });
-    
+
     audioElement.addEventListener('loadstart', () => {
         updateStatus('Conectando...', false);
-        
+
         // Timeout de 10 segundos para conectar
         connectionTimeout = setTimeout(() => {
             if (!isPlaying) {
@@ -155,23 +155,23 @@ function initAudio() {
             }
         }, 10000);
     });
-    
+
     audioElement.addEventListener('canplay', () => {
         clearTimeout(connectionTimeout);
         if (isPlaying) {
             updateStatus('Reproduciendo', true);
         }
     });
-    
+
     audioElement.addEventListener('playing', () => {
         clearTimeout(connectionTimeout);
         updateStatus('Reproduciendo', true);
     });
-    
+
     audioElement.addEventListener('stalled', () => {
         updateStatus('Buffering...', false);
     });
-    
+
     audioElement.addEventListener('loadedmetadata', () => {
         console.log('Metadata cargado');
     });
@@ -183,10 +183,10 @@ function initMetadata() {
     // El ID de la estación de Zeno se extrae de la URL: qt55qqa7dbtuv
     const zenoStationId = 'qt55qqa7dbtuv';
     const sseUrl = `https://api.zeno.fm/mounts/metadata/subscribe/${zenoStationId}`;
-    
+
     if (window.EventSource) {
         const source = new EventSource(sseUrl);
-        
+
         source.addEventListener('message', (e) => {
             try {
                 const data = JSON.parse(e.data);
@@ -214,14 +214,14 @@ function initMetadata() {
 function setupEventListeners() {
     // Play/Pause
     playBtn.addEventListener('click', togglePlay);
-    
+
     // Volumen
     volumeSlider.addEventListener('input', updateVolume);
-    
+
     // Menú móvil
     menuBtn.addEventListener('click', toggleMenu);
     closeMenuBtn.addEventListener('click', closeMenu);
-    
+
     // Ecualizador
     equalizerBtn.addEventListener('click', openEqualizer);
     equalizerMenuBtn.addEventListener('click', () => {
@@ -234,7 +234,7 @@ function setupEventListeners() {
             closeEqualizer();
         }
     });
-    
+
     // Cerrar menú al hacer click fuera
     document.addEventListener('click', (e) => {
         if (!mobileMenu.classList.contains('hidden') && !menuBtn.contains(e.target) && !mobileMenu.contains(e.target)) {
@@ -253,7 +253,7 @@ function togglePlay() {
             console.error('Error al reanudar contexto:', err);
         });
     }
-    
+
     if (isPlaying) {
         audioElement.pause();
     } else {
@@ -261,7 +261,7 @@ function togglePlay() {
         if (!audioElement.src) {
             audioElement.src = STREAM_URL;
         }
-        
+
         const playPromise = audioElement.play();
         if (playPromise !== undefined) {
             playPromise
@@ -281,7 +281,7 @@ function updateVolume() {
     const volume = volumeSlider.value / 100;
     audioElement.volume = volume;
     volumeValue.textContent = volumeSlider.value + '%';
-    
+
     // Guardar en localStorage
     localStorage.setItem('radioVolume', volumeSlider.value);
 }
@@ -324,14 +324,14 @@ function setupPWA() {
         deferredPrompt = e;
         showInstallPrompt();
     });
-    
+
     // Escuchar si ya está instalada
     window.addEventListener('appinstalled', () => {
         console.log('App instalada');
         deferredPrompt = null;
         installPrompt.classList.add('hidden');
     });
-    
+
     // Restaurar volumen guardado
     const savedVolume = localStorage.getItem('radioVolume');
     if (savedVolume) {
