@@ -1,4 +1,4 @@
-const CACHE_NAME = 'radio-uno-v1';
+const CACHE_NAME = 'radio-uno-v2';
 const urlsToCache = [
     './',
     './index.html',
@@ -23,6 +23,7 @@ self.addEventListener('install', (event) => {
                 });
             })
     );
+    // Forzar al nuevo SW a tomar el control inmediatamente
     self.skipWaiting();
 });
 
