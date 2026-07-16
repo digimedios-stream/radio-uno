@@ -50,16 +50,15 @@
                         if(navigator.share) {
                             navigator.share({
                                 title: 'Radio Uno Casereña',
-                                text: '¡Escucha Radio Uno Casereña en vivo!',
-                                url: 'https://www.radiounocasereña.com.ar'
+                                text: '¡Escucha Radio Uno Casereña en vivo! https://radiounocasereña.com.ar'
                             }).catch(function(err){
-                                if(err.name !== 'AbortError') alert('Enlace copiado al portapapeles: https://www.radiounocasereña.com.ar');
+                                if(err.name !== 'AbortError') alert('Enlace copiado al portapapeles: https://radiounocasereña.com.ar');
                             });
                         } else {
                             if(navigator.clipboard) {
-                                navigator.clipboard.writeText('https://www.radiounocasereña.com.ar').then(function(){alert('¡Enlace copiado al portapapeles!')});
+                                navigator.clipboard.writeText('https://radiounocasereña.com.ar').then(function(){alert('¡Enlace copiado al portapapeles!')});
                             } else {
-                                alert('Enlace para compartir: https://www.radiounocasereña.com.ar');
+                                alert('Enlace para compartir: https://radiounocasereña.com.ar');
                             }
                         }
                     ">
