@@ -1,4 +1,4 @@
-const CACHE_NAME = 'radio-uno-v2';
+const CACHE_NAME = 'radio-uno-v3';
 const urlsToCache = [
     './',
     './index.html',
