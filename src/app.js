@@ -23,6 +23,7 @@ const installPrompt = document.getElementById('installPrompt');
 const installBtn = document.getElementById('installBtn');
 const dismissBtn = document.getElementById('dismissBtn');
 const installMenuBtn = document.getElementById('installMenuBtn');
+const shareBtn = document.getElementById('shareBtn');
 
 // Stream URL - Usando proxy CORS para evitar restricciones
 // Se carga desde streams-config.js
@@ -221,6 +222,24 @@ function setupEventListeners() {
     // Menú móvil
     menuBtn.addEventListener('click', toggleMenu);
     closeMenuBtn.addEventListener('click', closeMenu);
+
+    // Compartir
+    if (shareBtn) {
+        shareBtn.addEventListener('click', () => {
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Radio Uno Casereña',
+                    text: '¡Escucha Radio Uno Casereña en vivo!',
+                    url: 'https://www.radiounocasereña.com.ar',
+                }).catch(console.error);
+            } else {
+                // Fallback para navegadores que no soportan Web Share API
+                navigator.clipboard.writeText('https://www.radiounocasereña.com.ar')
+                    .then(() => alert('¡Enlace copiado al portapapeles!'))
+                    .catch(() => alert('La dirección es: https://www.radiounocasereña.com.ar'));
+            }
+        });
+    }
 
     // Ecualizador
     equalizerBtn.addEventListener('click', openEqualizer);
