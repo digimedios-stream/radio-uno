@@ -223,37 +223,7 @@ function setupEventListeners() {
     menuBtn.addEventListener('click', toggleMenu);
     closeMenuBtn.addEventListener('click', closeMenu);
 
-    // Compartir
-    if (shareBtn) {
-        shareBtn.addEventListener('click', () => {
-            console.log('Botón compartir clickeado');
-            if (navigator.share) {
-                navigator.share({
-                    title: 'Radio Uno Casereña',
-                    text: '¡Escucha Radio Uno Casereña en vivo!',
-                    url: 'https://www.radiounocasereña.com.ar',
-                }).catch((error) => {
-                    console.error('Error compartiendo:', error);
-                    // Solo mostrar alerta si no es un error de "AbortError" (el usuario canceló)
-                    if (error.name !== 'AbortError') {
-                        fallbackShare();
-                    }
-                });
-            } else {
-                fallbackShare();
-            }
-        });
-    }
-
-    function fallbackShare() {
-        if (navigator.clipboard) {
-            navigator.clipboard.writeText('https://www.radiounocasereña.com.ar')
-                .then(() => alert('¡Enlace copiado al portapapeles!'))
-                .catch(() => alert('La dirección para compartir es: https://www.radiounocasereña.com.ar'));
-        } else {
-            alert('La dirección para compartir es: https://www.radiounocasereña.com.ar');
-        }
-    }
+    // Compartir está manejado en línea en index.html para evitar problemas de caché
 
     // Ecualizador
     equalizerBtn.addEventListener('click', openEqualizer);

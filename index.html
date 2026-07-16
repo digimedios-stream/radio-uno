@@ -46,8 +46,24 @@
                     <p class="frequency">90.7 MHz</p>
                 </div>
                 <div class="header-actions" style="display: flex; align-items: center; gap: 15px;">
-                    <button id="shareBtn" class="action-btn" aria-label="Compartir" style="background: none; border: none; color: white; padding: 0.5rem; display: flex; align-items: center; justify-content: center;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24">
+                    <button id="shareBtn" class="action-btn" aria-label="Compartir" style="background: none; border: none; color: white; padding: 0.5rem; display: flex; align-items: center; justify-content: center; position: relative; z-index: 9999;" onclick="
+                        if(navigator.share) {
+                            navigator.share({
+                                title: 'Radio Uno Casereña',
+                                text: '¡Escucha Radio Uno Casereña en vivo!',
+                                url: 'https://www.radiounocasereña.com.ar'
+                            }).catch(function(err){
+                                if(err.name !== 'AbortError') alert('Enlace copiado al portapapeles: https://www.radiounocasereña.com.ar');
+                            });
+                        } else {
+                            if(navigator.clipboard) {
+                                navigator.clipboard.writeText('https://www.radiounocasereña.com.ar').then(function(){alert('¡Enlace copiado al portapapeles!')});
+                            } else {
+                                alert('Enlace para compartir: https://www.radiounocasereña.com.ar');
+                            }
+                        }
+                    ">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" style="pointer-events: none;">
                             <circle cx="18" cy="5" r="3"></circle>
                             <circle cx="6" cy="12" r="3"></circle>
                             <circle cx="18" cy="19" r="3"></circle>
