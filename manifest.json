@@ -1,13 +1,18 @@
 {
+  "id": "/radio-uno-caserena/",
   "name": "Radio Uno Casereña 90.7 MHz",
   "short_name": "Radio Uno",
   "description": "Transmisión en vivo de Radio Uno Casereña 90.7 MHz",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
   "orientation": "portrait-primary",
   "background_color": "#0f172a",
   "theme_color": "#6366f1",
+  "lang": "es-AR",
+  "dir": "ltr",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "assets/icon-192.png",
@@ -34,7 +39,7 @@
       "purpose": "maskable"
     }
   ],
-  "categories": ["music"],
+  "categories": ["music", "entertainment"],
   "screenshots": [
     {
       "src": "assets/screenshot-1.png",
