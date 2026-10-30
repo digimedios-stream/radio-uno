@@ -76,32 +76,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initMetadata(); // Inicializar obtención de metadatos
     setupEventListeners();
     setupPWA();
-    attemptAutoplay(); // Iniciar reproducción automáticamente al abrir la PWA
+    attemptAutoplay(); // Intentar reproducción automática al abrir la PWA
 });
-
-// Conectar el elemento de audio al grafo Web Audio (Pre-amp + Compresor + Ecualizador + Analizador)
-function ensureWebAudioConnected() {
-    if (!audioContext || !audioElement || audioSource) return;
-
-    try {
-        audioSource = audioContext.createMediaElementSource(audioElement);
-        window.audioSource = audioSource;
-
-        // Si el ecualizador ya creó sus filtros, dejar que conecte la cadena; si no, conectar directo a gainNode
-        if (window.equalizerInstance && typeof window.equalizerInstance.reconnectSource === 'function') {
-            window.equalizerInstance.reconnectSource();
-        } else {
-            audioSource.connect(gainNode);
-        }
-
-        // Al pasar por Web Audio API, dejamos el elemento nativo al 100% y controlamos la ganancia con gainNode
-        audioElement.volume = 1.0;
-        updateVolume();
-        console.log('Audio source conectado al amplificador Web Audio correctamente');
-    } catch (e) {
-        console.warn('No se pudo conectar al amplificador Web Audio:', e);
-    }
-}
 
 // Actualizar ícono del botón Play/Pause
 function updatePlayButtonIcon(playing) {
@@ -130,9 +106,6 @@ function initAudio() {
     // Crear elemento de audio
     audioElement = new Audio();
     audioElement.crossOrigin = 'anonymous';
-    audioElement.preload = 'auto';
-    audioElement.autoplay = true;
-    audioElement.playsInline = true;
     audioElement.src = STREAM_URL;
 
     // Crear contexto de audio
@@ -140,42 +113,34 @@ function initAudio() {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
 
-    // Crear nodo de ganancia (Pre-amplificador / Boost de volumen)
+    // Crear nodo de ganancia (Amplificador de volumen)
     gainNode = audioContext.createGain();
-
-    // Crear compresor dinámico (Maximimizador broadcast para subir el volumen sin saturar/distorsionar)
-    compressorNode = audioContext.createDynamicsCompressor();
-    compressorNode.threshold.setValueAtTime(-14, audioContext.currentTime);
-    compressorNode.knee.setValueAtTime(12, audioContext.currentTime);
-    compressorNode.ratio.setValueAtTime(6, audioContext.currentTime);
-    compressorNode.attack.setValueAtTime(0.003, audioContext.currentTime);
-    compressorNode.release.setValueAtTime(0.25, audioContext.currentTime);
+    gainNode.gain.value = 1.5;
 
     // Crear analizador
     analyser = audioContext.createAnalyser();
     analyser.fftSize = 256;
 
-    // Conectar cadena de salida: gainNode -> compressorNode -> analyser -> destination
-    gainNode.connect(compressorNode);
-    compressorNode.connect(analyser);
-    analyser.connect(audioContext.destination);
-
-    // Conectar fuente si el contexto ya está activo o cuando pase a 'running'
-    if (audioContext.state === 'running') {
-        ensureWebAudioConnected();
-    }
-    audioContext.addEventListener('statechange', () => {
-        if (audioContext.state === 'running') {
-            ensureWebAudioConnected();
+    // Conectar elemento de audio al contexto (solo una vez)
+    if (!audioSource) {
+        try {
+            audioSource = audioContext.createMediaElementSource(audioElement);
+            audioSource.connect(gainNode);
+            gainNode.connect(analyser);
+            analyser.connect(audioContext.destination);
+            console.log('Audio source y amplificador conectados correctamente');
+        } catch (e) {
+            console.warn('No se pudo conectar al analizador:', e);
+            analyser.connect(audioContext.destination);
         }
-    });
+    }
 
     // Exportar para otros módulos
     window.audioContext = audioContext;
     window.audioElement = audioElement;
     window.analyser = analyser;
     window.gainNode = gainNode;
-    window.compressorNode = compressorNode;
+    window.audioSource = audioSource;
 
     // Configurar volumen inicial
     updateVolume();
@@ -189,11 +154,7 @@ function initAudio() {
         updatePlayButtonIcon(true);
         updateStatus('Reproduciendo', true);
         if (audioContext && audioContext.state === 'suspended') {
-            audioContext.resume().then(() => {
-                ensureWebAudioConnected();
-            }).catch(() => {});
-        } else {
-            ensureWebAudioConnected();
+            audioContext.resume();
         }
         // Limpiar timeout si se conecta
         clearTimeout(connectionTimeout);
@@ -328,14 +289,8 @@ function setupEventListeners() {
 function attemptAutoplay() {
     if (isPlaying) return;
 
-    if (!audioElement.src) {
-        audioElement.src = STREAM_URL;
-    }
-
     if (audioContext && audioContext.state === 'suspended') {
-        audioContext.resume().then(() => {
-            ensureWebAudioConnected();
-        }).catch(() => {});
+        audioContext.resume().catch(() => {});
     }
 
     const playPromise = audioElement.play();
@@ -343,53 +298,37 @@ function attemptAutoplay() {
         playPromise
             .then(() => {
                 console.log('Reproducción automática iniciada');
-                if (audioContext && audioContext.state === 'suspended') {
-                    audioContext.resume().then(() => ensureWebAudioConnected()).catch(() => {});
-                } else {
-                    ensureWebAudioConnected();
-                }
             })
             .catch(() => {
-                console.log('Autoplay bloqueado por el sistema hasta el primer toque en pantalla');
-                updateStatus('Toca la pantalla para escuchar', false);
+                isPlaying = false;
+                updatePlayButtonIcon(false);
+                console.log('Autoplay bloqueado hasta el primer toque');
+                updateStatus('Toca para escuchar', false);
                 bindAutoplayUnlock();
             });
     }
 }
 
-// Si el sistema operativo bloquea el autoplay inicial, activar al primer toque en cualquier parte de la pantalla
+// Si el navegador bloquea el autoplay inicial, iniciar al primer toque en pantalla
 function bindAutoplayUnlock() {
     if (autoplayUnlockBound) return;
     autoplayUnlockBound = true;
 
-    const unlockEvents = ['pointerdown', 'touchstart', 'click', 'keydown'];
-
     const unlockHandler = (e) => {
-        unlockEvents.forEach(evt => document.removeEventListener(evt, unlockHandler, true));
+        document.removeEventListener('click', unlockHandler);
         autoplayUnlockBound = false;
 
-        if (audioContext && audioContext.state === 'suspended') {
-            audioContext.resume().then(() => ensureWebAudioConnected()).catch(() => {});
-        }
-
-        // Si el usuario tocó directamente el botón Play, togglePlay se encargará
+        // Si tocó el botón Play directamente, su propio listener togglePlay lo manejará
         if (e && e.target && playBtn && playBtn.contains(e.target)) {
             return;
         }
 
         if (!isPlaying) {
-            if (!audioElement.src) {
-                audioElement.src = STREAM_URL;
-            }
-            audioElement.play().then(() => {
-                ensureWebAudioConnected();
-            }).catch(err => {
-                console.warn('No se pudo iniciar tras interacción:', err);
-            });
+            togglePlay();
         }
     };
 
-    unlockEvents.forEach(evt => document.addEventListener(evt, unlockHandler, { capture: true, passive: true }));
+    document.addEventListener('click', unlockHandler);
 }
 
 // Toggle Play/Pause
@@ -397,20 +336,17 @@ function togglePlay() {
     // Reanudar contexto de audio si está suspendido
     if (audioContext && audioContext.state === 'suspended') {
         audioContext.resume().then(() => {
-            ensureWebAudioConnected();
             console.log('Audio context reanudado');
         }).catch(err => {
             console.error('Error al reanudar contexto:', err);
         });
-    } else {
-        ensureWebAudioConnected();
     }
 
     if (isPlaying) {
         audioElement.pause();
     } else {
         // Asegurar que el src está configurado
-        if (!audioElement.src) {
+        if (!audioElement.src || audioElement.error) {
             audioElement.src = STREAM_URL;
         }
 
@@ -422,30 +358,25 @@ function togglePlay() {
                 })
                 .catch(err => {
                     console.error('Error al reproducir:', err);
-                    updateStatus('Error: ' + err.message, false);
+                    // Reintentar recargando el stream si quedó interrumpido
+                    audioElement.src = STREAM_URL;
+                    audioElement.play().catch(err2 => {
+                        updateStatus('Error: ' + err2.message, false);
+                    });
                 });
         }
     }
 }
 
-// Actualizar volumen (Soporta de 0% a 200% con pre-amplificador Web Audio)
+// Actualizar volumen (Soporta de 0% a 200% con amplificador Web Audio)
 function updateVolume() {
     const rawValue = parseInt(volumeSlider.value, 10);
-    const normalized = rawValue / 100; // 0.0 a 2.0
+    const volume = rawValue / 100; // 0.0 a 2.0
 
-    if (audioSource && gainNode && audioContext) {
-        // Mantener el volumen del elemento HTML al 100% y amplificar con GainNode
-        audioElement.volume = 1.0;
-        // Aplicamos un pre-amplificador base de 1.8x para que al 100% ya suene fuerte y claro,
-        // llegando hasta 3.6x al 200% (protegido contra distorsión por el DynamicsCompressor)
-        const boostedGain = normalized * 1.8;
-        gainNode.gain.setValueAtTime(boostedGain, audioContext.currentTime);
-    } else {
-        // Fallback antes de que Web Audio esté activo
-        audioElement.volume = Math.min(1.0, normalized);
-        if (gainNode && audioContext) {
-            gainNode.gain.setValueAtTime(normalized * 1.8, audioContext.currentTime);
-        }
+    // Mantener el volumen nativo hasta 1.0 y amplificar con gainNode
+    audioElement.volume = Math.min(1.0, volume);
+    if (gainNode) {
+        gainNode.gain.value = volume * 1.8;
     }
 
     volumeValue.textContent = rawValue + '%';
