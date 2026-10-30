@@ -2,9 +2,12 @@
 let audioContext;
 let audioElement;
 let analyser;
+let gainNode;
+let compressorNode;
 let audioSource; // Guardar la fuente de audio
 let isPlaying = false;
 let deferredPrompt;
+let autoplayUnlockBound = false;
 
 // Elementos del DOM
 const playBtn = document.getElementById('playBtn');
@@ -61,17 +64,75 @@ window.STREAMS = STREAMS;
 
 // Inicializar
 document.addEventListener('DOMContentLoaded', () => {
+    // Restaurar volumen guardado ANTES de inicializar el audio
+    const savedVolume = localStorage.getItem('radioVolumeV2');
+    if (savedVolume !== null) {
+        volumeSlider.value = savedVolume;
+    } else {
+        volumeSlider.value = 150; // 150% por defecto (Modo Amplificado)
+    }
+
     initAudio();
     initMetadata(); // Inicializar obtención de metadatos
     setupEventListeners();
     setupPWA();
+    attemptAutoplay(); // Iniciar reproducción automáticamente al abrir la PWA
 });
+
+// Conectar el elemento de audio al grafo Web Audio (Pre-amp + Compresor + Ecualizador + Analizador)
+function ensureWebAudioConnected() {
+    if (!audioContext || !audioElement || audioSource) return;
+
+    try {
+        audioSource = audioContext.createMediaElementSource(audioElement);
+        window.audioSource = audioSource;
+
+        // Si el ecualizador ya creó sus filtros, dejar que conecte la cadena; si no, conectar directo a gainNode
+        if (window.equalizerInstance && typeof window.equalizerInstance.reconnectSource === 'function') {
+            window.equalizerInstance.reconnectSource();
+        } else {
+            audioSource.connect(gainNode);
+        }
+
+        // Al pasar por Web Audio API, dejamos el elemento nativo al 100% y controlamos la ganancia con gainNode
+        audioElement.volume = 1.0;
+        updateVolume();
+        console.log('Audio source conectado al amplificador Web Audio correctamente');
+    } catch (e) {
+        console.warn('No se pudo conectar al amplificador Web Audio:', e);
+    }
+}
+
+// Actualizar ícono del botón Play/Pause
+function updatePlayButtonIcon(playing) {
+    if (!playBtn) return;
+    if (playing) {
+        playBtn.classList.add('playing');
+        playBtn.setAttribute('aria-label', 'Pausar');
+        playBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="currentColor" style="margin-left: 0;">
+                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+            </svg>
+        `;
+    } else {
+        playBtn.classList.remove('playing');
+        playBtn.setAttribute('aria-label', 'Reproducir');
+        playBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z"/>
+            </svg>
+        `;
+    }
+}
 
 // Inicializar audio
 function initAudio() {
     // Crear elemento de audio
     audioElement = new Audio();
     audioElement.crossOrigin = 'anonymous';
+    audioElement.preload = 'auto';
+    audioElement.autoplay = true;
+    audioElement.playsInline = true;
     audioElement.src = STREAM_URL;
 
     // Crear contexto de audio
@@ -79,29 +140,42 @@ function initAudio() {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
 
+    // Crear nodo de ganancia (Pre-amplificador / Boost de volumen)
+    gainNode = audioContext.createGain();
+
+    // Crear compresor dinámico (Maximimizador broadcast para subir el volumen sin saturar/distorsionar)
+    compressorNode = audioContext.createDynamicsCompressor();
+    compressorNode.threshold.setValueAtTime(-14, audioContext.currentTime);
+    compressorNode.knee.setValueAtTime(12, audioContext.currentTime);
+    compressorNode.ratio.setValueAtTime(6, audioContext.currentTime);
+    compressorNode.attack.setValueAtTime(0.003, audioContext.currentTime);
+    compressorNode.release.setValueAtTime(0.25, audioContext.currentTime);
+
     // Crear analizador
     analyser = audioContext.createAnalyser();
     analyser.fftSize = 256;
 
-    // Conectar elemento de audio al contexto (solo una vez)
-    if (!audioSource) {
-        try {
-            audioSource = audioContext.createMediaElementSource(audioElement);
-            audioSource.connect(analyser);
-            analyser.connect(audioContext.destination);
-            console.log('Audio source conectado correctamente');
-        } catch (e) {
-            console.warn('No se pudo conectar al analizador:', e);
-            // Fallback: conectar directamente al destino
-            analyser.connect(audioContext.destination);
-        }
+    // Conectar cadena de salida: gainNode -> compressorNode -> analyser -> destination
+    gainNode.connect(compressorNode);
+    compressorNode.connect(analyser);
+    analyser.connect(audioContext.destination);
+
+    // Conectar fuente si el contexto ya está activo o cuando pase a 'running'
+    if (audioContext.state === 'running') {
+        ensureWebAudioConnected();
     }
+    audioContext.addEventListener('statechange', () => {
+        if (audioContext.state === 'running') {
+            ensureWebAudioConnected();
+        }
+    });
 
     // Exportar para otros módulos
     window.audioContext = audioContext;
     window.audioElement = audioElement;
     window.analyser = analyser;
-    window.audioSource = audioSource;
+    window.gainNode = gainNode;
+    window.compressorNode = compressorNode;
 
     // Configurar volumen inicial
     updateVolume();
@@ -112,10 +186,14 @@ function initAudio() {
     // Event listeners del audio
     audioElement.addEventListener('play', () => {
         isPlaying = true;
-        playBtn.classList.add('playing');
+        updatePlayButtonIcon(true);
         updateStatus('Reproduciendo', true);
-        if (audioContext.state === 'suspended') {
-            audioContext.resume();
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume().then(() => {
+                ensureWebAudioConnected();
+            }).catch(() => {});
+        } else {
+            ensureWebAudioConnected();
         }
         // Limpiar timeout si se conecta
         clearTimeout(connectionTimeout);
@@ -123,7 +201,7 @@ function initAudio() {
 
     audioElement.addEventListener('pause', () => {
         isPlaying = false;
-        playBtn.classList.remove('playing');
+        updatePlayButtonIcon(false);
         updateStatus('Pausado', false);
         clearTimeout(connectionTimeout);
     });
@@ -246,15 +324,86 @@ function setupEventListeners() {
     });
 }
 
+// Iniciar reproducción automáticamente al abrir la PWA
+function attemptAutoplay() {
+    if (isPlaying) return;
+
+    if (!audioElement.src) {
+        audioElement.src = STREAM_URL;
+    }
+
+    if (audioContext && audioContext.state === 'suspended') {
+        audioContext.resume().then(() => {
+            ensureWebAudioConnected();
+        }).catch(() => {});
+    }
+
+    const playPromise = audioElement.play();
+    if (playPromise !== undefined) {
+        playPromise
+            .then(() => {
+                console.log('Reproducción automática iniciada');
+                if (audioContext && audioContext.state === 'suspended') {
+                    audioContext.resume().then(() => ensureWebAudioConnected()).catch(() => {});
+                } else {
+                    ensureWebAudioConnected();
+                }
+            })
+            .catch(() => {
+                console.log('Autoplay bloqueado por el sistema hasta el primer toque en pantalla');
+                updateStatus('Toca la pantalla para escuchar', false);
+                bindAutoplayUnlock();
+            });
+    }
+}
+
+// Si el sistema operativo bloquea el autoplay inicial, activar al primer toque en cualquier parte de la pantalla
+function bindAutoplayUnlock() {
+    if (autoplayUnlockBound) return;
+    autoplayUnlockBound = true;
+
+    const unlockEvents = ['pointerdown', 'touchstart', 'click', 'keydown'];
+
+    const unlockHandler = (e) => {
+        unlockEvents.forEach(evt => document.removeEventListener(evt, unlockHandler, true));
+        autoplayUnlockBound = false;
+
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume().then(() => ensureWebAudioConnected()).catch(() => {});
+        }
+
+        // Si el usuario tocó directamente el botón Play, togglePlay se encargará
+        if (e && e.target && playBtn && playBtn.contains(e.target)) {
+            return;
+        }
+
+        if (!isPlaying) {
+            if (!audioElement.src) {
+                audioElement.src = STREAM_URL;
+            }
+            audioElement.play().then(() => {
+                ensureWebAudioConnected();
+            }).catch(err => {
+                console.warn('No se pudo iniciar tras interacción:', err);
+            });
+        }
+    };
+
+    unlockEvents.forEach(evt => document.addEventListener(evt, unlockHandler, { capture: true, passive: true }));
+}
+
 // Toggle Play/Pause
 function togglePlay() {
     // Reanudar contexto de audio si está suspendido
     if (audioContext && audioContext.state === 'suspended') {
         audioContext.resume().then(() => {
+            ensureWebAudioConnected();
             console.log('Audio context reanudado');
         }).catch(err => {
             console.error('Error al reanudar contexto:', err);
         });
+    } else {
+        ensureWebAudioConnected();
     }
 
     if (isPlaying) {
@@ -279,14 +428,35 @@ function togglePlay() {
     }
 }
 
-// Actualizar volumen
+// Actualizar volumen (Soporta de 0% a 200% con pre-amplificador Web Audio)
 function updateVolume() {
-    const volume = volumeSlider.value / 100;
-    audioElement.volume = volume;
-    volumeValue.textContent = volumeSlider.value + '%';
+    const rawValue = parseInt(volumeSlider.value, 10);
+    const normalized = rawValue / 100; // 0.0 a 2.0
+
+    if (audioSource && gainNode && audioContext) {
+        // Mantener el volumen del elemento HTML al 100% y amplificar con GainNode
+        audioElement.volume = 1.0;
+        // Aplicamos un pre-amplificador base de 1.8x para que al 100% ya suene fuerte y claro,
+        // llegando hasta 3.6x al 200% (protegido contra distorsión por el DynamicsCompressor)
+        const boostedGain = normalized * 1.8;
+        gainNode.gain.setValueAtTime(boostedGain, audioContext.currentTime);
+    } else {
+        // Fallback antes de que Web Audio esté activo
+        audioElement.volume = Math.min(1.0, normalized);
+        if (gainNode && audioContext) {
+            gainNode.gain.setValueAtTime(normalized * 1.8, audioContext.currentTime);
+        }
+    }
+
+    volumeValue.textContent = rawValue + '%';
+    if (rawValue > 100) {
+        volumeValue.classList.add('boosted');
+    } else {
+        volumeValue.classList.remove('boosted');
+    }
 
     // Guardar en localStorage
-    localStorage.setItem('radioVolume', volumeSlider.value);
+    localStorage.setItem('radioVolumeV2', rawValue);
 }
 
 // Actualizar estado
@@ -334,13 +504,6 @@ function setupPWA() {
         deferredPrompt = null;
         installPrompt.classList.add('hidden');
     });
-
-    // Restaurar volumen guardado
-    const savedVolume = localStorage.getItem('radioVolume');
-    if (savedVolume) {
-        volumeSlider.value = savedVolume;
-        updateVolume();
-    }
 }
 
 function showInstallPrompt() {

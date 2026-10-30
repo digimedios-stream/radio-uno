@@ -13,13 +13,14 @@ class Equalizer {
         };
         
         this.currentPreset = 'flat';
+        window.equalizerInstance = this;
         this.init();
     }
     
     init() {
         // Esperar a que el contexto de audio esté disponible
         const checkContext = setInterval(() => {
-            if (window.audioContext && window.audioElement && window.audioSource) {
+            if (window.audioContext) {
                 clearInterval(checkContext);
                 this.setupFilters();
                 this.setupEventListeners();
@@ -30,7 +31,6 @@ class Equalizer {
     
     setupFilters() {
         const audioContext = window.audioContext;
-        const audioSource = window.audioSource;
         
         // Crear filtros para cada frecuencia
         const frequencies = [60, 250, 1000, 4000, 16000];
@@ -43,26 +43,30 @@ class Equalizer {
             filter.gain.value = 0;
             this.filters[freq] = filter;
         });
+
+        // Conectar filtros en cadena entre sí
+        for (let i = 0; i < frequencies.length - 1; i++) {
+            this.filters[frequencies[i]].connect(this.filters[frequencies[i + 1]]);
+        }
+
+        // Conectar el último filtro al amplificador (gainNode) o al analizador
+        const lastFilter = this.filters[frequencies[frequencies.length - 1]];
+        lastFilter.connect(window.gainNode || window.analyser);
+
+        // Si ya existe audioSource, conectarlo al primer filtro
+        this.reconnectSource();
         
-        // Desconectar la ruta directa para que el sonido solo pase por los filtros
+        console.log('Ecualizador configurado correctamente');
+    }
+
+    reconnectSource() {
+        if (!window.audioSource || !this.filters[60]) return;
         try {
-            audioSource.disconnect();
+            window.audioSource.disconnect();
         } catch (e) {
             console.log("No se pudo desconectar la ruta original", e);
         }
-        
-        // Conectar filtros en cadena
-        let lastNode = audioSource;
-        
-        frequencies.forEach(freq => {
-            lastNode.connect(this.filters[freq]);
-            lastNode = this.filters[freq];
-        });
-        
-        // Conectar de nuevo al analizador
-        lastNode.connect(window.analyser);
-        
-        console.log('Ecualizador configurado correctamente');
+        window.audioSource.connect(this.filters[60]);
     }
     
     setupEventListeners() {

@@ -429,10 +429,16 @@ body {
 }
 
 .volume-value {
-    min-width: 40px;
+    min-width: 48px;
     text-align: right;
     font-size: 0.875rem;
     color: var(--text-secondary);
+    transition: color 0.2s ease, font-weight 0.2s ease;
+}
+
+.volume-value.boosted {
+    color: var(--accent);
+    font-weight: 700;
 }
 
 /* Información de la radio */
