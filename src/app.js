@@ -101,12 +101,31 @@ function updatePlayButtonIcon(playing) {
     }
 }
 
+// Conectar el amplificador y analizador Web Audio solo cuando el AudioContext esté activo ('running')
+// Esto evita que un AudioContext suspendido en móviles silencie el streaming durante el autoplay
+function connectWebAudioIfRunning() {
+    if (!audioContext || !audioElement || audioSource) return;
+    if (audioContext.state !== 'running') return;
+
+    try {
+        audioSource = audioContext.createMediaElementSource(audioElement);
+        audioSource.connect(gainNode);
+        gainNode.connect(analyser);
+        analyser.connect(audioContext.destination);
+        window.audioSource = audioSource;
+        updateVolume();
+        console.log('Audio source y amplificador conectados correctamente');
+    } catch (e) {
+        console.warn('No se pudo conectar al analizador:', e);
+    }
+}
+
 // Inicializar audio
 function initAudio() {
     // Crear elemento de audio
     audioElement = new Audio();
     audioElement.crossOrigin = 'anonymous';
-    audioElement.src = STREAM_URL;
+    audioElement.preload = 'none';
 
     // Crear contexto de audio
     if (!audioContext) {
@@ -121,26 +140,35 @@ function initAudio() {
     analyser = audioContext.createAnalyser();
     analyser.fftSize = 256;
 
-    // Conectar elemento de audio al contexto (solo una vez)
-    if (!audioSource) {
-        try {
-            audioSource = audioContext.createMediaElementSource(audioElement);
-            audioSource.connect(gainNode);
-            gainNode.connect(analyser);
-            analyser.connect(audioContext.destination);
-            console.log('Audio source y amplificador conectados correctamente');
-        } catch (e) {
-            console.warn('No se pudo conectar al analizador:', e);
-            analyser.connect(audioContext.destination);
-        }
-    }
-
     // Exportar para otros módulos
     window.audioContext = audioContext;
     window.audioElement = audioElement;
     window.analyser = analyser;
     window.gainNode = gainNode;
-    window.audioSource = audioSource;
+
+    // Si el contexto ya está corriendo o cuando pase a 'running', conectar el amplificador
+    if (audioContext.state === 'running') {
+        connectWebAudioIfRunning();
+    }
+    audioContext.addEventListener('statechange', () => {
+        if (audioContext.state === 'running') {
+            connectWebAudioIfRunning();
+        }
+    });
+
+    // Desbloquear AudioContext en móviles ante cualquier toque en la pantalla
+    const resumeContextOnTouch = () => {
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume().then(() => {
+                connectWebAudioIfRunning();
+            }).catch(() => {});
+        } else {
+            connectWebAudioIfRunning();
+        }
+    };
+    document.addEventListener('touchstart', resumeContextOnTouch, { passive: true });
+    document.addEventListener('touchend', resumeContextOnTouch, { passive: true });
+    document.addEventListener('click', resumeContextOnTouch, { passive: true });
 
     // Configurar volumen inicial
     updateVolume();
@@ -154,7 +182,11 @@ function initAudio() {
         updatePlayButtonIcon(true);
         updateStatus('Reproduciendo', true);
         if (audioContext && audioContext.state === 'suspended') {
-            audioContext.resume();
+            audioContext.resume().then(() => {
+                connectWebAudioIfRunning();
+            }).catch(() => {});
+        } else {
+            connectWebAudioIfRunning();
         }
         // Limpiar timeout si se conecta
         clearTimeout(connectionTimeout);
@@ -289,8 +321,12 @@ function setupEventListeners() {
 function attemptAutoplay() {
     if (isPlaying) return;
 
+    audioElement.src = STREAM_URL;
+
     if (audioContext && audioContext.state === 'suspended') {
-        audioContext.resume().catch(() => {});
+        audioContext.resume().then(() => {
+            connectWebAudioIfRunning();
+        }).catch(() => {});
     }
 
     const playPromise = audioElement.play();
@@ -336,19 +372,21 @@ function togglePlay() {
     // Reanudar contexto de audio si está suspendido
     if (audioContext && audioContext.state === 'suspended') {
         audioContext.resume().then(() => {
+            connectWebAudioIfRunning();
             console.log('Audio context reanudado');
         }).catch(err => {
             console.error('Error al reanudar contexto:', err);
         });
+    } else {
+        connectWebAudioIfRunning();
     }
 
     if (isPlaying) {
         audioElement.pause();
     } else {
-        // Asegurar que el src está configurado
-        if (!audioElement.src || audioElement.error) {
-            audioElement.src = STREAM_URL;
-        }
+        // Recargar siempre la URL del stream en vivo al iniciar para evitar conexiones vencidas en móviles
+        audioElement.src = STREAM_URL;
+        audioElement.load();
 
         const playPromise = audioElement.play();
         if (playPromise !== undefined) {
@@ -358,11 +396,7 @@ function togglePlay() {
                 })
                 .catch(err => {
                     console.error('Error al reproducir:', err);
-                    // Reintentar recargando el stream si quedó interrumpido
-                    audioElement.src = STREAM_URL;
-                    audioElement.play().catch(err2 => {
-                        updateStatus('Error: ' + err2.message, false);
-                    });
+                    updateStatus('Error: ' + err.message, false);
                 });
         }
     }

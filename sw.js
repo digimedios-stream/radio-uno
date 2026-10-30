@@ -1,13 +1,13 @@
-const CACHE_NAME = 'radio-uno-v8';
+const CACHE_NAME = 'radio-uno-v9';
 const urlsToCache = [
     './',
     './index.html',
     './manifest.json',
-    './src/styles.css',
-    './src/app.js',
-    './src/audio-visualizer.js',
-    './src/equalizer.js',
-    './src/pwa-installer.js',
+    './src/styles.css?v=9',
+    './src/app.js?v=9',
+    './src/audio-visualizer.js?v=9',
+    './src/equalizer.js?v=9',
+    './src/pwa-installer.js?v=9',
     './assets/logo.png'
 ];
 
@@ -60,9 +60,9 @@ self.addEventListener('fetch', (event) => {
         return;
     }
     
-    // Estrategia: Network first, fallback to cache (siempre obtiene la versión más nueva de la app)
+    // Estrategia: Network first evitando caché HTTP de disco en móviles, fallback to cache
     event.respondWith(
-        fetch(event.request)
+        fetch(event.request, { cache: 'no-cache' })
             .then((response) => {
                 // Validar la respuesta
                 if (!response || response.status !== 200 || response.type === 'error') {

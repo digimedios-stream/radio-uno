@@ -13,7 +13,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/icon-192.png">
     <link rel="apple-touch-icon" href="assets/icon-192.png">
-    <link rel="stylesheet" href="src/styles.css">
+    <link rel="stylesheet" href="src/styles.css?v=9">
 </head>
 <body>
     <!-- Instalación PWA -->
@@ -228,7 +228,7 @@
         </div>
         <!-- Footer -->
         <footer class="app-footer">
-            <p>Digimedios Apps &copy; 2026</p>
+            <p>Digimedios Apps &copy; 2026 &bull; v1.9</p>
         </footer>
 
         <!-- Botón flotante de WhatsApp -->
@@ -237,22 +237,39 @@
         </a>
     </div>
 
-    <script src="src/app.js"></script>
-    <script src="src/audio-visualizer.js"></script>
-    <script src="src/equalizer.js"></script>
-    <script src="src/pwa-installer.js"></script>
+    <script src="src/app.js?v=9"></script>
+    <script src="src/audio-visualizer.js?v=9"></script>
+    <script src="src/equalizer.js?v=9"></script>
+    <script src="src/pwa-installer.js?v=9"></script>
     
     <script>
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').then(reg => {
-                // Detectar cuando hay una nueva actualización
+            let refreshing = false;
+            // Recargar automáticamente en móviles apenas el nuevo Service Worker tome el control
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!refreshing) {
+                    refreshing = true;
+                    window.location.reload();
+                }
+            });
+
+            navigator.serviceWorker.register('sw.js?v=9', { updateViaCache: 'none' }).then(reg => {
+                // Forzar búsqueda de actualización al abrir la PWA
+                reg.update();
+
+                // También buscar actualizaciones cada vez que la app vuelve al primer plano en el celular
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible') {
+                        reg.update();
+                    }
+                });
+
                 reg.addEventListener('updatefound', () => {
                     const newWorker = reg.installing;
+                    if (!newWorker) return;
                     newWorker.addEventListener('statechange', () => {
-                        // Si hay un nuevo SW instalado y ya teníamos uno controlando la página
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            console.log('¡Nueva versión encontrada! Recargando para aplicar cambios...');
-                            window.location.reload(); // Recarga automática
+                            newWorker.postMessage({ type: 'SKIP_WAITING' });
                         }
                     });
                 });
